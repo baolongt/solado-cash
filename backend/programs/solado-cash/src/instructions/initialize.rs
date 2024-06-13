@@ -1,7 +1,7 @@
 use anchor_lang::prelude::*;
 use anchor_spl::token::{ Token, Mint, TokenAccount };
 
-use crate::contants::{ POOL_VAULT_AMOUNT_SEED, POOL_VAULT_SEED };
+use crate::{ contants::{ POOL_VAULT_AMOUNT_SEED, POOL_VAULT_SEED }, state::MerkleTreeInfo };
 
 #[derive(Accounts)]
 pub struct Initialize<'info> {
@@ -18,7 +18,9 @@ pub struct Initialize<'info> {
         token::mint = pool_token,
         token::authority = pool_vault
     )]
-    pub pool_vault: Account<'info, TokenAccount>,
+    pub pool_vault: Account<'info, TokenAccount>, // Token account of pool
+
+    pub merkle_tree: Account<'info, MerkleTreeInfo>,
 
     pub system_program: Program<'info, System>,
     pub token_program: Program<'info, Token>,
