@@ -4,4 +4,7 @@ use anchor_lang::prelude::*;
 pub enum AppError {
     #[msg("not owner")]
     NotOwner,
+
+    #[msg("invalid amount")]
+    InvalidAmount,
 }

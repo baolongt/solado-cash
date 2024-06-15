@@ -15,4 +15,8 @@ pub mod solado_cash {
     pub fn initialize(ctx: Context<Initialize>) -> Result<()> {
         instructions::initialize(ctx)
     }
+
+    pub fn deposit(ctx: Context<Deposit>, amount: u64) -> Result<()> {
+        instructions::deposit(ctx, amount)
+    }
 }

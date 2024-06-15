@@ -14,6 +14,8 @@ import {
 } from "@solana/spl-token";
 import { loadKeypairFromFile } from "./lib/helper";
 import { expect } from "chai";
+import { BN } from "bn.js";
+
 describe("solado-cash", () => {
   // Configure the client to use the local cluster.
   const provider = anchor.AnchorProvider.env();
@@ -25,7 +27,7 @@ describe("solado-cash", () => {
 
   const user = loadKeypairFromFile();
   let userTokenAccount: anchor.web3.PublicKey;
-  let poolVault: anchor.web3.PublicKey;
+  let mmrAccount: anchor.web3.PublicKey;
 
   before(async () => {
     // init staker
@@ -59,22 +61,19 @@ describe("solado-cash", () => {
         user.publicKey
       );
 
-      const createStakerTokenAccountIx =
-        createAssociatedTokenAccountInstruction(
-          user.publicKey,
-          userTokenAccount,
-          user.publicKey,
-          usdcMintKp.publicKey
-        );
-
-      console.log("user token account", userTokenAccount.toBase58());
+      const createUserTokenAccountIx = createAssociatedTokenAccountInstruction(
+        user.publicKey,
+        userTokenAccount,
+        user.publicKey,
+        usdcMintKp.publicKey
+      );
 
 
       const mintToUserIx = createMintToInstruction(
         usdcMintKp.publicKey,
         userTokenAccount,
         provider.publicKey,
-        1000 * 10 ** 6,
+        100000 * 10 ** 6,
         []
       );
 
@@ -83,7 +82,7 @@ describe("solado-cash", () => {
         ...[
           createMintIx,
           initMintIx,
-          createStakerTokenAccountIx,
+          createUserTokenAccountIx,
           mintToUserIx,
         ]
       );
@@ -96,40 +95,87 @@ describe("solado-cash", () => {
     }
 
 
-    poolVault = anchor.web3.PublicKey.findProgramAddressSync(
+
+
+    mmrAccount = anchor.web3.PublicKey.findProgramAddressSync(
       [
         Buffer.from("pool_vault"),
         Buffer.from("1000_USDC"),
-        usdcMintKp.publicKey.toBytes()
+        usdcMintKp.publicKey.toBytes(),
       ],
       program.programId
     )[0];
 
-    console.log("Pool vault", poolVault.toBase58());
+    console.log("mmmAccount", mmrAccount.toBase58());
 
   })
 
   it("Is initialized!", async () => {
+    mmrAccount = anchor.web3.PublicKey.findProgramAddressSync(
+      [
+        Buffer.from("pool_vault"),
+        Buffer.from("1000_USDC"),
+        usdcMintKp.publicKey.toBytes(),
+      ],
+      program.programId
+    )[0];
+
+    const poolTokenAccount = getAssociatedTokenAddressSync(
+      usdcMintKp.publicKey,
+      mmrAccount,
+      true
+    );
     // Add your test here.
     const tx = await program.methods.initialize().accounts({
       admin: provider.publicKey,
       poolToken: usdcMintKp.publicKey,
-      poolVault: poolVault,
+      mmrAccount: mmrAccount,
+      poolTokenAccount: poolTokenAccount,
       systemProgram: anchor.web3.SystemProgram.programId,
       tokenProgram: TOKEN_PROGRAM_ID,
+      associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
     })
       .rpc();
 
     console.log("init tx", tx);
-    const poolAccount = await getAccount(provider.connection, poolVault);
-    console.log("pool account address", poolAccount);
+    const merkleTreeAccount = await program.account.merkleMountainRange.fetch(mmrAccount);
 
-    expect(poolAccount.address.toBase58()).to.equal(
-      poolVault.toBase58()
+    expect(merkleTreeAccount.nodes).to.eql([]);
+    expect(merkleTreeAccount.peaks).to.eql([]);
+  });
+
+  it("Should deposit successfully", async () => {
+    const poolTokenAccount = getAssociatedTokenAddressSync(
+      usdcMintKp.publicKey,
+      mmrAccount,
+      true
     );
-    expect(poolAccount.mint.toBase58()).to.equal(
-      usdcMintKp.publicKey.toBase58()
-    );
-    expect(poolAccount.amount).to.equal(BigInt(0));
+    const depositAmount = new BN(1000 * 10 ** 6);
+    const txs = []
+
+    for (let i = 0; i < 10; i++) {
+
+      const tx = await program.rpc.deposit(
+        depositAmount,
+        {
+          accounts: {
+            user: user.publicKey,
+            poolToken: usdcMintKp.publicKey,
+            userTokenAccount: userTokenAccount,
+            mmrAccount: mmrAccount,
+            poolTokenAccount: poolTokenAccount,
+            systemProgram: anchor.web3.SystemProgram.programId,
+            tokenProgram: TOKEN_PROGRAM_ID,
+            associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
+          },
+          signers: [user]
+        }
+      );
+
+      txs.push(tx);
+    }
+
+    console.table(txs);
+
   });
 });

@@ -1,7 +1,7 @@
 use anchor_lang::prelude::*;
-use anchor_spl::token::{ Token, Mint, TokenAccount };
+use anchor_spl::{ associated_token::AssociatedToken, token::{ Mint, Token, TokenAccount } };
 
-use crate::{ contants::{ POOL_VAULT_AMOUNT_SEED, POOL_VAULT_SEED }, state::MerkleTreeInfo };
+use crate::{ contants::{ POOL_VAULT_AMOUNT_SEED, POOL_VAULT_SEED }, state::MerkleMountainRange };
 
 #[derive(Accounts)]
 pub struct Initialize<'info> {
@@ -13,19 +13,25 @@ pub struct Initialize<'info> {
     #[account(
         init,
         payer = admin,
+        space = 8 + MerkleMountainRange::INIT_SPACE,
         seeds = [POOL_VAULT_SEED, POOL_VAULT_AMOUNT_SEED, pool_token.key().as_ref()],
-        bump,
-        token::mint = pool_token,
-        token::authority = pool_vault
+        bump
     )]
-    pub pool_vault: Account<'info, TokenAccount>, // Token account of pool
+    pub mmr_account: Account<'info, MerkleMountainRange>,
 
-    pub merkle_tree: Account<'info, MerkleTreeInfo>,
+    #[account(
+        init,
+        payer = admin,
+        associated_token::mint = pool_token,
+        associated_token::authority = mmr_account
+    )]
+    pub pool_token_account: Account<'info, TokenAccount>,
 
     pub system_program: Program<'info, System>,
     pub token_program: Program<'info, Token>,
+    pub associated_token_program: Program<'info, AssociatedToken>,
 }
 
-pub fn initialize(_ctx: Context<Initialize>) -> Result<()> {
+pub fn initialize(ctx: Context<Initialize>) -> Result<()> {
     Ok(())
 }
