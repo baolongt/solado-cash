@@ -33,5 +33,19 @@ pub struct Initialize<'info> {
 }
 
 pub fn initialize(ctx: Context<Initialize>) -> Result<()> {
+    let mmr_account = &mut ctx.accounts.mmr_account;
+
+    // Fake randomness
+    let slot = Clock::get()?.slot;
+    let slot_bytes = slot.to_le_bytes();
+    let mmr_account_bytes = mmr_account.to_account_info().key.as_ref();
+    let mut combined_bytes = [0u8; 32];
+    combined_bytes[..8].copy_from_slice(&slot_bytes);
+    combined_bytes[8..].copy_from_slice(&mmr_account_bytes[..24]);
+
+    // Initialize with a dummy node
+    mmr_account.nodes = vec![combined_bytes];
+    mmr_account.peaks = vec![0];
+    mmr_account.deposit_count = 0;
     Ok(())
 }

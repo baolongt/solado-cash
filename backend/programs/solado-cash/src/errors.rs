@@ -7,4 +7,10 @@ pub enum AppError {
 
     #[msg("invalid amount")]
     InvalidAmount,
+
+    #[msg("Invalid leaf index")]
+    InvalidLeafIndex,
+
+    #[msg("Invalid authority")]
+    InvalidAuthority,
 }

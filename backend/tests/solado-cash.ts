@@ -140,8 +140,8 @@ describe("solado-cash", () => {
     console.log("init tx", tx);
     const merkleTreeAccount = await program.account.merkleMountainRange.fetch(mmrAccount);
 
-    expect(merkleTreeAccount.nodes).to.eql([]);
-    expect(merkleTreeAccount.peaks).to.eql([]);
+    expect(merkleTreeAccount.nodes.length).to.equal(1);
+    expect(merkleTreeAccount.peaks.length).to.equal(1);
   });
 
   it("Should deposit successfully", async () => {
@@ -150,32 +150,64 @@ describe("solado-cash", () => {
       mmrAccount,
       true
     );
-    const depositAmount = new BN(1000 * 10 ** 6);
     const txs = []
+    const proofs = [];
 
-    for (let i = 0; i < 10; i++) {
 
-      const tx = await program.rpc.deposit(
-        depositAmount,
-        {
-          accounts: {
-            user: user.publicKey,
-            poolToken: usdcMintKp.publicKey,
-            userTokenAccount: userTokenAccount,
-            mmrAccount: mmrAccount,
-            poolTokenAccount: poolTokenAccount,
-            systemProgram: anchor.web3.SystemProgram.programId,
-            tokenProgram: TOKEN_PROGRAM_ID,
-            associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
-          },
-          signers: [user]
+    for (let i = 0; i < 5; i++) {
+      try {
+        console.log("depositing", i);
+        const merkleTreeAccount = await program.account.merkleMountainRange.fetch(mmrAccount);
+        let lengthBuffer = Buffer.alloc(8);
+        lengthBuffer.writeUInt32LE(merkleTreeAccount.nodes.length, 0);
+        const proofAccountPubKey = anchor.web3.PublicKey.findProgramAddressSync(
+          [
+            Buffer.from("proof"),
+            user.publicKey.toBytes(),
+            mmrAccount.toBytes(),
+            lengthBuffer,
+          ],
+          program.programId
+        )[0];
+        const depositAmount = new BN(1000 * 10 ** 6);
+
+        const tx = await program.rpc.deposit(
+          depositAmount,
+          {
+            accounts: {
+              user: user.publicKey,
+              poolToken: usdcMintKp.publicKey,
+              userTokenAccount: userTokenAccount,
+              mmrAccount: mmrAccount,
+              proofAccount: proofAccountPubKey,
+              poolTokenAccount: poolTokenAccount,
+              systemProgram: anchor.web3.SystemProgram.programId,
+              tokenProgram: TOKEN_PROGRAM_ID,
+              associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
+            },
+            signers: [user]
+          }
+        );
+        txs.push(tx);
+
+        const proofAccount = await program.account.proofAccount.fetch(proofAccountPubKey);
+
+        let hashes = [];
+        for (let i = 0; i < proofAccount.proof.length; i += 32) {
+          const chunk = proofAccount.proof.slice(i, i + 32);
+          hashes.push(chunk);
         }
-      );
+        proofs.push(hashes);
 
-      txs.push(tx);
+      } catch (e) {
+        console.log("error", e);
+
+      }
     }
 
     console.table(txs);
-
+    console.table(proofs);
   });
+
+
 });

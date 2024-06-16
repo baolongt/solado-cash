@@ -1,15 +1,17 @@
 use anchor_lang::prelude::*;
 use anchor_spl::{
     associated_token::AssociatedToken,
-    token::{ transfer, self, Mint, Token, TokenAccount },
+    token::{ transfer, Mint, Token, TokenAccount },
 };
 use crate::{
-    contants::{ POOL_VAULT_AMOUNT_SEED, POOL_VAULT_SEED },
+    contants::PROOF_SEED,
     errors::AppError,
-    state::{ DepositInfo, MerkleMountainRange },
+    generate_proof,
+    state::{ MerkleMountainRange, ProofAccount },
 };
 use anchor_lang::solana_program::hash;
 use anchor_spl::token::Transfer;
+
 #[derive(Accounts)]
 pub struct Deposit<'info> {
     #[account(mut)]
@@ -29,6 +31,21 @@ pub struct Deposit<'info> {
         mut,
     )]
     pub mmr_account: Account<'info, MerkleMountainRange>,
+
+    #[account(
+        init_if_needed,
+        payer = user,
+        space = 8 + ProofAccount::INIT_SPACE,
+        seeds = [
+            PROOF_SEED,
+            user.to_account_info().key.as_ref(),
+            mmr_account.to_account_info().key.as_ref(),
+            // this for unique account for each time user deposit
+            mmr_account.nodes.len().to_le_bytes().as_ref(),
+        ],
+        bump
+    )]
+    pub proof_account: Account<'info, ProofAccount>,
 
     #[account(mut, token::mint = pool_token, token::authority = mmr_account)]
     pub pool_token_account: Account<'info, TokenAccount>,
@@ -69,6 +86,7 @@ pub fn deposit(ctx: Context<Deposit>, amount: u64) -> Result<()> {
 
     // 2. Update Peaks
     let mut leaf_index = mmr_account.nodes.len() - 1;
+    let current_leaf_index = leaf_index as u32;
 
     let mut combined = [0u8; 64];
     while leaf_index > 0 {
@@ -94,8 +112,14 @@ pub fn deposit(ctx: Context<Deposit>, amount: u64) -> Result<()> {
             break;
         }
     }
-
+    ctx.accounts.mmr_account.deposit_count += 1;
     msg!("Deposit Success");
+
+    msg!("Leaf Index: {:?}", current_leaf_index);
+    // store proof to proof account
+    ctx.accounts.proof_account.owner = *ctx.accounts.user.to_account_info().key;
+    ctx.accounts.proof_account.proof = generate_proof(&ctx, current_leaf_index)?;
+    ctx.accounts.proof_account.deposit_number = ctx.accounts.mmr_account.deposit_count;
 
     Ok(())
 }
