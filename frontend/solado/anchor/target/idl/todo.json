@@ -1,0 +1,26 @@
+{
+  "address": "8KTv6JKDHuhcWwt37MJuU3qDrpYnZHQ6bDQa4EVcT4oU",
+  "metadata": {
+    "name": "todo",
+    "version": "0.1.0",
+    "spec": "0.1.0",
+    "description": "Created with Anchor"
+  },
+  "instructions": [
+    {
+      "name": "greet",
+      "discriminator": [
+        203,
+        194,
+        3,
+        150,
+        228,
+        58,
+        181,
+        62
+      ],
+      "accounts": [],
+      "args": []
+    }
+  ]
+}
