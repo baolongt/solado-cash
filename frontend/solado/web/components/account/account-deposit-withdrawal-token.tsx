@@ -1,12 +1,3 @@
-/**
-  create component account deposit withdrawal token
-  2 tab deposit and withdrawal
-  deposit tabs - form Token select 2 options SOL and USDC , Amount input number, button submit action show console log with value
-  withdrawal tabs - form Note input textarea auto expand height , Recipient Address input text, button submit action show console log with value
-  daisyUI for styling
-  when submit button it will show loading
-  use useMutation  from "@tanstack/react-query" for loading state
-*/
 import React, { useState } from 'react';
 
 const AccountDepositWithdrawalToken: React.FC = () => {
