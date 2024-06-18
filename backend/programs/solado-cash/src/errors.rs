@@ -13,4 +13,10 @@ pub enum AppError {
 
     #[msg("Invalid authority")]
     InvalidAuthority,
+
+    #[msg("Index out of bound")]
+    IndexOutOfBound,
+
+    #[msg("Invalid proof")]
+    InvalidProof,
 }
