@@ -5,6 +5,7 @@ mod contants;
 mod errors;
 mod instructions;
 mod state;
+mod utils;
 
 declare_id!("GtviumFyW3zVqLCmxJZpBSbQT4LePTyMAubHVZA4DT7X");
 
@@ -17,6 +18,6 @@ pub mod solado_cash {
     }
 
     pub fn deposit(ctx: Context<Deposit>, amount: u64) -> Result<()> {
-        instructions::deposit(ctx, amount)
+        instructions::_deposit(ctx, amount)
     }
 }

@@ -15,6 +15,8 @@ import {
 import { loadKeypairFromFile } from "./lib/helper";
 import { expect } from "chai";
 import { BN } from "bn.js";
+import { hashString } from "./lib/hash";
+import * as bs58 from 'bs58';
 
 describe("solado-cash", () => {
   // Configure the client to use the local cluster.
@@ -27,7 +29,7 @@ describe("solado-cash", () => {
 
   const user = loadKeypairFromFile();
   let userTokenAccount: anchor.web3.PublicKey;
-  let mmrAccount: anchor.web3.PublicKey;
+  let mtAccoountPubKey: anchor.web3.PublicKey;
 
   before(async () => {
     // init staker
@@ -94,10 +96,7 @@ describe("solado-cash", () => {
 
     }
 
-
-
-
-    mmrAccount = anchor.web3.PublicKey.findProgramAddressSync(
+    mtAccoountPubKey = anchor.web3.PublicKey.findProgramAddressSync(
       [
         Buffer.from("pool_vault"),
         Buffer.from("1000_USDC"),
@@ -106,99 +105,95 @@ describe("solado-cash", () => {
       program.programId
     )[0];
 
-    console.log("mmmAccount", mmrAccount.toBase58());
+    console.log("mmmAccount", mtAccoountPubKey.toBase58());
 
   })
 
   it("Is initialized!", async () => {
-    mmrAccount = anchor.web3.PublicKey.findProgramAddressSync(
-      [
-        Buffer.from("pool_vault"),
-        Buffer.from("1000_USDC"),
-        usdcMintKp.publicKey.toBytes(),
-      ],
-      program.programId
-    )[0];
-
     const poolTokenAccount = getAssociatedTokenAddressSync(
       usdcMintKp.publicKey,
-      mmrAccount,
+      mtAccoountPubKey,
       true
     );
-    // Add your test here.
-    const tx = await program.methods.initialize().accounts({
-      admin: provider.publicKey,
-      poolToken: usdcMintKp.publicKey,
-      mmrAccount: mmrAccount,
-      poolTokenAccount: poolTokenAccount,
-      systemProgram: anchor.web3.SystemProgram.programId,
-      tokenProgram: TOKEN_PROGRAM_ID,
-      associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
-    })
-      .rpc();
 
-    console.log("init tx", tx);
-    const merkleTreeAccount = await program.account.merkleMountainRange.fetch(mmrAccount);
+    try {
+      // Add your test here.
+      const tx = await program.methods.initialize().accounts({
+        admin: provider.publicKey,
+        poolToken: usdcMintKp.publicKey,
+        merkleTreeAccount: mtAccoountPubKey,
+        poolTokenAccount: poolTokenAccount,
+        systemProgram: anchor.web3.SystemProgram.programId,
+        tokenProgram: TOKEN_PROGRAM_ID,
+        associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
+      })
+        .rpc();
+      console.log("init tx", tx);
 
-    expect(merkleTreeAccount.nodes.length).to.equal(1);
-    expect(merkleTreeAccount.peaks.length).to.equal(1);
+    }
+    catch (e) {
+      console.log("error", e);
+    }
+
+    const merkleTreeAccount = await program.account.merkleTree.fetch(mtAccoountPubKey);
+
+    expect(merkleTreeAccount.levels).to.equal(8);
+    expect(merkleTreeAccount.currentLeafIndex.toNumber()).to.equal(1);
+
   });
 
   it("Should deposit successfully", async () => {
     const poolTokenAccount = getAssociatedTokenAddressSync(
       usdcMintKp.publicKey,
-      mmrAccount,
+      mtAccoountPubKey,
       true
     );
     const txs = []
-    const proofs = [];
+    const proofs = {};
 
 
-    for (let i = 0; i < 5; i++) {
+    for (let i = 0; i < 20; i++) {
       try {
         console.log("depositing", i);
-        const merkleTreeAccount = await program.account.merkleMountainRange.fetch(mmrAccount);
-        let lengthBuffer = Buffer.alloc(8);
-        lengthBuffer.writeUInt32LE(merkleTreeAccount.nodes.length, 0);
-        const proofAccountPubKey = anchor.web3.PublicKey.findProgramAddressSync(
+        const merkleTreeAccount = await program.account.merkleTree.fetch(mtAccoountPubKey);
+
+        const noteAccountPubKey = anchor.web3.PublicKey.findProgramAddressSync(
           [
-            Buffer.from("proof"),
+            Buffer.from("note"),
             user.publicKey.toBytes(),
-            mmrAccount.toBytes(),
-            lengthBuffer,
+            mtAccoountPubKey.toBytes(),
+            Buffer.from(merkleTreeAccount.currentLeafIndex.toArray("le", 8))
           ],
           program.programId
         )[0];
+        console.log("noteAccountPubKey", noteAccountPubKey.toBase58());
         const depositAmount = new BN(1000 * 10 ** 6);
 
-        const tx = await program.rpc.deposit(
-          depositAmount,
-          {
-            accounts: {
-              user: user.publicKey,
-              poolToken: usdcMintKp.publicKey,
-              userTokenAccount: userTokenAccount,
-              mmrAccount: mmrAccount,
-              proofAccount: proofAccountPubKey,
-              poolTokenAccount: poolTokenAccount,
-              systemProgram: anchor.web3.SystemProgram.programId,
-              tokenProgram: TOKEN_PROGRAM_ID,
-              associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
-            },
-            signers: [user]
-          }
-        );
+        const tx = await program.methods.deposit(depositAmount).accounts({
+          userTokenAccount: userTokenAccount,
+          noteAccount: noteAccountPubKey,
+          user: user.publicKey,
+          merkleTreeAccount: mtAccoountPubKey,
+          poolTokenAccount: poolTokenAccount,
+          poolToken: usdcMintKp.publicKey,
+          tokenProgram: TOKEN_PROGRAM_ID,
+          associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
+        })
+          .signers([user])
+          .rpc();
+
+
         txs.push(tx);
 
-        const proofAccount = await program.account.proofAccount.fetch(proofAccountPubKey);
 
-        let hashes = [];
-        for (let i = 0; i < proofAccount.proof.length; i += 32) {
-          const chunk = proofAccount.proof.slice(i, i + 32);
-          hashes.push(chunk);
-        }
-        proofs.push(hashes);
+        const noteAccount = await program.account.note.fetch(noteAccountPubKey);
+        proofs[noteAccountPubKey.toBase58()] = {
+          proof: noteAccount.proof,
+          root: merkleTreeAccount.root,
+        };
 
+
+        expect(noteAccount.proof).to.be.not.null;
       } catch (e) {
         console.log("error", e);
 
