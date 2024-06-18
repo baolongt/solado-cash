@@ -3,3 +3,5 @@
 export * from './counter-exports';
 
 export * from './todo-exports'
+
+export * from './solado-cash-exports'

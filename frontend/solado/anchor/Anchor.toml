@@ -5,7 +5,7 @@ seeds = false
 skip-lint = false
 
 [programs.localnet]
-todo = "8KTv6JKDHuhcWwt37MJuU3qDrpYnZHQ6bDQa4EVcT4oU"
+solado_cash = "esfrnUs49Ng4j1ZVBzjhsKYMrhrufr8sh4PYWXFH4rm"
 
 [registry]
 url = "https://api.apr.dev"

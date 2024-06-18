@@ -14,6 +14,7 @@ const links: { label: string; path: string }[] = [
   { label: 'Clusters', path: '/clusters' },
   { label: 'Counter Program', path: '/counter' },
     { label: 'Todo Program', path: '/todo' },
+    // { label: 'SoladoCash Program', path: '/solado-cash' },
 ];
 
 export default function RootLayout({
