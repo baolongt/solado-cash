@@ -1,9 +1,11 @@
-use solana_program::hash::hash;
+use solana_program::{ msg, keccak };
 
 pub fn hash_pair(left: &[u8; 32], right: &[u8; 32]) -> [u8; 32] {
-    let mut combined_leaf_bytes = [0u8; 64];
-    combined_leaf_bytes[..32].copy_from_slice(left);
-    combined_leaf_bytes[32..].copy_from_slice(right);
-    let combined_leaf_hash = hash(&combined_leaf_bytes);
-    combined_leaf_hash.to_bytes()
+    if left <= right {
+        let hash = keccak::hashv(&[left, right]).0;
+        hash
+    } else {
+        let hash = keccak::hashv(&[right, left]).0;
+        hash
+    }
 }

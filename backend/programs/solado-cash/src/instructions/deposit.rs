@@ -90,6 +90,7 @@ pub fn _deposit(ctx: Context<Deposit>, amount: u64) -> Result<()> {
     note.proof = merkle_tree.generate_proof(leaf_index);
     note.root = merkle_tree.root;
     note.owner = *user.key;
+    note.leaf = leaf.to_bytes();
 
     Ok(())
 }

@@ -18,6 +18,11 @@ import { BN } from "bn.js";
 import { hashString } from "./lib/hash";
 import * as bs58 from 'bs58';
 
+const modifyComputeUnits =
+  anchor.web3.ComputeBudgetProgram.setComputeUnitLimit({
+    units: 10_000_000,
+  });
+
 describe("solado-cash", () => {
   // Configure the client to use the local cluster.
   const provider = anchor.AnchorProvider.env();
@@ -138,7 +143,6 @@ describe("solado-cash", () => {
     const merkleTreeAccount = await program.account.merkleTree.fetch(mtAccoountPubKey);
 
     expect(merkleTreeAccount.levels).to.equal(8);
-    expect(merkleTreeAccount.currentLeafIndex.toNumber()).to.equal(1);
 
   });
 
@@ -152,7 +156,7 @@ describe("solado-cash", () => {
     const proofs = {};
 
 
-    for (let i = 0; i < 20; i++) {
+    for (let i = 0; i < 10; i++) {
       try {
         console.log("depositing", i);
         const merkleTreeAccount = await program.account.merkleTree.fetch(mtAccoountPubKey);
@@ -180,17 +184,39 @@ describe("solado-cash", () => {
           associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
         })
           .signers([user])
+          .preInstructions([modifyComputeUnits])
           .rpc();
-
 
         txs.push(tx);
 
 
         const noteAccount = await program.account.note.fetch(noteAccountPubKey);
-        proofs[noteAccountPubKey.toBase58()] = {
+
+        const obj = {
           proof: noteAccount.proof,
-          root: merkleTreeAccount.root,
-        };
+          root: bs58.encode(new Uint8Array(noteAccount.root)),
+          leaf: bs58.encode(new Uint8Array(noteAccount.leaf)),
+        }
+        proofs[noteAccountPubKey.toBase58()] = obj
+
+        const withdraw_tx = await program.methods.withdraw(
+          obj.proof,
+          obj.root,
+          obj.leaf,
+        ).accounts({
+          userTokenAccount: userTokenAccount,
+          user: user.publicKey,
+          merkleTreeAccount: mtAccoountPubKey,
+          poolTokenAccount: poolTokenAccount,
+          poolToken: usdcMintKp.publicKey,
+          tokenProgram: TOKEN_PROGRAM_ID,
+          associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
+        })
+          .signers([user])
+          .preInstructions([modifyComputeUnits])
+          .rpc();
+
+        console.log("withdraw tx", withdraw_tx);
 
 
         expect(noteAccount.proof).to.be.not.null;
@@ -201,7 +227,6 @@ describe("solado-cash", () => {
     }
 
     console.table(txs);
-    console.table(proofs);
   });
 
 

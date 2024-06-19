@@ -39,7 +39,7 @@ pub fn initialize(ctx: Context<Initialize>) -> Result<()> {
     let merkle_tree = &mut ctx.accounts.merkle_tree_account;
 
     merkle_tree.levels = 8;
-    merkle_tree.current_leaf_index = 1;
+    merkle_tree.current_leaf_index = (2u64).pow((merkle_tree.levels as u32) - 1) - 1; // 1-indexed
     // Initialize empty nodes
     for level in 0..merkle_tree.levels {
         let zero_hash_for_level = zero((level + 1).into());

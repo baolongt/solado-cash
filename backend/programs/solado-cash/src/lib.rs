@@ -20,4 +20,13 @@ pub mod solado_cash {
     pub fn deposit(ctx: Context<Deposit>, amount: u64) -> Result<()> {
         instructions::_deposit(ctx, amount)
     }
+
+    pub fn withdraw(
+        ctx: Context<Withdraw>,
+        proof: String,
+        root: String,
+        leaf: String
+    ) -> Result<()> {
+        instructions::withdraw(ctx, proof, root, leaf)
+    }
 }
